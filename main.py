@@ -4,6 +4,7 @@ import streamlit as st
 import json
 import os
 import matplotlib.pyplot as plt
+import random
 
 # Charger les données depuis un fichier JSON
 def load_data(file_path):
@@ -24,6 +25,10 @@ def calculate_power_and_efficiency(input_voltage, output_voltage, input_current,
     efficiency = (power_out / power_in) * 100 if power_in != 0 else 0
     return power_in, power_out, efficiency
 
+# Fonction pour formater les valeurs avec des couleurs
+def format_value(label, value, unit, color):
+    return f'<span style="color:{color};">{label}: {value} {unit}</span>'
+
 # Interface utilisateur
 def main():
     st.title("Calculateur de Puissance et de Rendement d'un Transformateur")
@@ -32,7 +37,26 @@ def main():
     file_path = 'calculations.json'
     data = load_data(file_path)
 
-    # Saisie des données
+    # Affichage de l'historique des calculs dans la barre latérale
+    st.sidebar.header("Historique des Calculs")
+    for item in data:
+        with st.sidebar.expander(f"Calcul {item['id']}", expanded=False):
+            st.markdown(format_value("Tension d'entrée", item['input_voltage'], "V", "blue"), unsafe_allow_html=True)
+            st.markdown(format_value("Tension de sortie", item['output_voltage'], "V", "green"), unsafe_allow_html=True)
+            st.markdown(format_value("Courant d'entrée", item['input_current'], "A", "blue"), unsafe_allow_html=True)
+            st.markdown(format_value("Courant de sortie", item['output_current'], "A", "green"), unsafe_allow_html=True)
+            st.markdown(format_value("Puissance d'entrée", item['power_in'], "W", "blue"), unsafe_allow_html=True)
+            st.markdown(format_value("Puissance de sortie", item['power_out'], "W", "green"), unsafe_allow_html=True)
+            st.markdown(format_value("Rendement", f"{item['efficiency']:.2f}", "%", "red"), unsafe_allow_html=True)
+            
+            if st.button(f"Supprimer le calcul {item['id']}", key=f"delete_{item['id']}"):
+                data = [i for i in data if i['id'] != item['id']]
+                save_data(file_path, data)
+
+                # Ajouter un paramètre aléatoire pour forcer le rechargement de la page
+                st.experimental_set_query_params(updated=str(random.randint(0, 100000)))
+
+    # Saisie des données pour un nouveau calcul
     st.header("Nouveau Calcul")
     input_voltage = st.number_input("Tension d'entrée (V)", min_value=0.0)
     output_voltage = st.number_input("Tension de sortie (V)", min_value=0.0)
@@ -41,9 +65,11 @@ def main():
 
     if st.button("Calculer"):
         power_in, power_out, efficiency = calculate_power_and_efficiency(input_voltage, output_voltage, input_current, output_current)
-        st.write(f"Puissance d'entrée : {power_in} W")
-        st.write(f"Puissance de sortie : {power_out} W")
-        st.write(f"Rendement : {efficiency:.2f} %")
+        
+        # Afficher les résultats avec des couleurs
+        st.markdown(format_value("Puissance d'entrée", power_in, "W", "blue"), unsafe_allow_html=True)
+        st.markdown(format_value("Puissance de sortie", power_out, "W", "green"), unsafe_allow_html=True)
+        st.markdown(format_value("Rendement", f"{efficiency:.2f}", "%", "red"), unsafe_allow_html=True)
 
         # Enregistrer le calcul
         new_id = max([item['id'] for item in data], default=0) + 1
@@ -59,31 +85,16 @@ def main():
         })
         save_data(file_path, data)
 
-    # Afficher l'historique des calculs
-    st.header("Historique des Calculs")
-    for item in data:
-        st.write(f"ID: {item['id']}")
-        st.write(f"Tension d'entrée : {item['input_voltage']} V")
-        st.write(f"Tension de sortie : {item['output_voltage']} V")
-        st.write(f"Courant d'entrée : {item['input_current']} A")
-        st.write(f"Courant de sortie : {item['output_current']} A")
-        st.write(f"Puissance d'entrée : {item['power_in']} W")
-        st.write(f"Puissance de sortie : {item['power_out']} W")
-        st.write(f"Rendement : {item['efficiency']:.2f} %")
-        
-        # Options pour modifier ou supprimer un calcul
-        if st.button(f"Supprimer le calcul {item['id']}"):
-            data = [i for i in data if i['id'] != item['id']]
-            save_data(file_path, data)
-            st.experimental_rerun()
-
     # Graphe de l'efficacité
     st.header("Graphique du Rendement")
     efficiencies = [item['efficiency'] for item in data]
     if efficiencies:
-        plt.plot(range(len(efficiencies)), efficiencies, marker='o')
-        plt.xlabel("Calcul #")
-        plt.ylabel("Rendement (%)")
+        plt.figure(figsize=(8, 6))
+        plt.plot(range(len(efficiencies)), efficiencies, marker='o', color='blue', linestyle='-', linewidth=2, markersize=8)
+        plt.xlabel("Calcul #", fontsize=14)
+        plt.ylabel("Rendement (%)", fontsize=14)
+        plt.title("Évolution du Rendement des Transformateurs", fontsize=16)
+        plt.grid(True)
         st.pyplot(plt)
 
 if __name__ == "__main__":
